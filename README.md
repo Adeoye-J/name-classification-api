@@ -1,17 +1,33 @@
-# 🚀 HNG Stage 0 Backend Task – API Integration & Data Processing Assessment
+# 🚀 HNG Backend Task – Stage 0 & Stage 1 API
 
 ## 📌 Overview
 
-This project implements a simple backend API that classifies a given name by gender using the **Genderize.io API**.
+This project implements a backend API that:
 
-The API processes the raw response and returns a structured result, including a confidence check based on probability and sample size.
+* **Stage 0:** Classifies a given name by gender using the Genderize API
+* **Stage 1:** Creates and stores a complete user profile by aggregating data from multiple external APIs
+
+The system integrates with:
+
+* Genderize (gender prediction)
+* Agify (age prediction)
+* Nationalize (nationality prediction)
+
+It processes, validates, and persists structured results while ensuring idempotency.
 
 ---
 
 ## 🌐 Live API
 
+```bash
+https://name-classification-api.vercel.app
 ```
-https://name-classification-api.vercel.app/api/classify?name=john
+
+### Example Endpoints
+
+```bash
+GET  /api/classify?name=john
+POST /api/profiles
 ```
 
 ---
@@ -21,6 +37,8 @@ https://name-classification-api.vercel.app/api/classify?name=john
 * Node.js
 * Express.js
 * Axios
+* lowdb (JSON database)
+* UUID
 * CORS
 * dotenv
 
@@ -33,12 +51,18 @@ name-classification-api/
 │
 ├── src/
 │   ├── routes/
-│   │   └── classify.route.js
+│   │   ├── classify.route.js
+│   │   └── profile.route.js
+│   │
 │   ├── services/
-│   │   └── genderize.service.js
+│   │   ├── genderize.service.js
+│   │   └── profile.service.js
+│   │
 │   └── utils/
-│       └── helpers.js
+│       ├── helpers.js
+│       └── db.js
 │
+├── db.json
 ├── index.js
 ├── package.json
 ├── .env
@@ -47,13 +71,13 @@ name-classification-api/
 
 ---
 
+# 🟢 Stage 0 – Name Classification
+
 ## 📥 Endpoint
 
 ### GET `/api/classify?name={name}`
 
----
-
-## ✅ Success Response
+### ✅ Success Response
 
 ```json
 {
@@ -71,14 +95,75 @@ name-classification-api/
 
 ---
 
+# 🔵 Stage 1 – Profile Creation & Persistence
+
+## 📥 Endpoint
+
+### POST `/api/profiles`
+
+### Request Body
+
+```json
+{
+  "name": "james"
+}
+```
+
+---
+
+## ✅ Success Response (New Profile)
+
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "019d8f68-b1b7-7484-b042-3c2d65e215ea",
+    "name": "james",
+    "gender": "male",
+    "gender_probability": 1,
+    "sample_size": 1458986,
+    "age": 74,
+    "age_group": "senior",
+    "country_id": "US",
+    "country_probability": 0.08733511114519656,
+    "created_at": "2026-04-15T04:31:36.376Z"
+  }
+}
+```
+
+---
+
+## 🔁 Idempotent Response (Existing Profile)
+
+```json
+{
+  "status": "success",
+  "message": "Profile already exists",
+  "data": {
+    "id": "019d8f68-b1b7-7484-b042-3c2d65e215ea",
+    "name": "james",
+    "gender": "male",
+    "gender_probability": 1,
+    "sample_size": 1458986,
+    "age": 74,
+    "age_group": "senior",
+    "country_id": "US",
+    "country_probability": 0.08733511114519656,
+    "created_at": "2026-04-15T04:31:36.376Z"
+  }
+}
+```
+
+---
+
 ## ❌ Error Responses
 
-### 400 – Missing or Empty Name
+### 400 – Missing Name
 
 ```json
 {
   "status": "error",
-  "message": "Name query parameter is required"
+  "message": "Name is required"
 }
 ```
 
@@ -105,7 +190,7 @@ name-classification-api/
 ```json
 {
   "status": "error",
-  "message": "Failed to fetch data from Genderize API"
+  "message": "Failed to fetch external APIs"
 }
 ```
 
@@ -113,38 +198,64 @@ name-classification-api/
 
 ## 🧠 Processing Logic
 
-* Extracted fields from Genderize API:
+### Genderize
+
+* Extract:
 
   * `gender`
-  * `probability`
+  * `probability → gender_probability`
   * `count → sample_size`
 
-* Confidence is determined as:
+### Agify
 
-  * `is_confident = true` if:
+* Extract:
 
-    * probability ≥ 0.7 **AND**
-    * sample_size ≥ 100
-  * Otherwise, `false`
+  * `age`
+* Classify:
 
-* `processed_at` is dynamically generated using:
+  * 0–12 → child
+  * 13–19 → teenager
+  * 20–59 → adult
+  * 60+ → senior
 
-```
-new Date().toISOString()
-```
+### Nationalize
+
+* Extract:
+
+  * List of countries
+* Select:
+
+  * Country with highest probability → `country_id`
+
+---
+
+## 💾 Data Persistence
+
+* Profiles are stored in a local JSON database (`db.json`)
+* Each profile includes:
+
+  * UUID
+  * Processed fields
+  * UTC timestamp
+
+---
+
+## 🔁 Idempotency
+
+* Submitting the same name multiple times does **not create duplicates**
+* Existing record is returned instead
 
 ---
 
 ## ⚡ Performance Notes
 
-* Response time optimized to stay under 500ms (excluding external API latency)
-* Lightweight architecture ensures stability under multiple requests
+* External API calls are executed in parallel using `Promise.all`
+* Response time optimized for efficiency
+* Lightweight storage ensures fast read/write operations
 
 ---
 
 ## 🔐 CORS
-
-CORS is enabled to allow requests from any origin:
 
 ```
 Access-Control-Allow-Origin: *
@@ -156,19 +267,19 @@ Access-Control-Allow-Origin: *
 
 ### 1. Install dependencies
 
-```
+```bash
 npm install
 ```
 
 ### 2. Start server
 
-```
+```bash
 npm run dev
 ```
 
-### 3. Test endpoint
+### 3. Test endpoints
 
-```
+```bash
 http://localhost:3000/api/classify?name=john
 ```
 
@@ -176,7 +287,7 @@ http://localhost:3000/api/classify?name=john
 
 ## 🌍 Deployment
 
-You can deploy using:
+Supported platforms:
 
 * Vercel
 * Railway
@@ -188,13 +299,14 @@ You can deploy using:
 ## 🧪 Testing Checklist
 
 * Valid request returns correct structure
+* Duplicate name returns existing profile
 * Missing name → 400 error
 * Invalid type → 422 error
-* Unknown name → 422 error
+* Invalid predictions → 422 error
 * API failure → 502 error
 
 ---
 
 ## 👨‍💻 Author
 
-FunGeek - Jeremiah Bankole
+FunGeek – Jeremiah Bankole

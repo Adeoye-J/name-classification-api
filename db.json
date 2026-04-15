@@ -35,6 +35,18 @@
       "country_id": "NG",
       "country_probability": 0.07808044340500363,
       "created_at": "2026-04-15T04:12:08.505Z"
+    },
+    {
+      "id": "019d8f68-b1b7-7484-b042-3c2d65e215ea",
+      "name": "james",
+      "gender": "male",
+      "gender_probability": 1,
+      "sample_size": 1458986,
+      "age": 74,
+      "age_group": "senior",
+      "country_id": "US",
+      "country_probability": 0.08733511114519656,
+      "created_at": "2026-04-15T04:31:36.376Z"
     }
   ]
 }
