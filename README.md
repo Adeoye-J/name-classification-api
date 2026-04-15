@@ -1,19 +1,22 @@
-# 🚀 HNG Backend Task – Stage 0 & Stage 1 API
+# 🚀 Profile Intelligence Service API (HNG Stage 0 & Stage 1)
 
 ## 📌 Overview
 
-This project implements a backend API that:
+This project is a backend API that evolves across two stages:
 
-* **Stage 0:** Classifies a given name by gender using the Genderize API
-* **Stage 1:** Creates and stores a complete user profile by aggregating data from multiple external APIs
+### 🟢 Stage 0
 
-The system integrates with:
+Classifies a name using the Genderize API and returns processed gender insights.
 
-* Genderize (gender prediction)
-* Agify (age prediction)
-* Nationalize (nationality prediction)
+### 🔵 Stage 1
 
-It processes, validates, and persists structured results while ensuring idempotency.
+Builds a **Profile Intelligence Service** that:
+
+* Enriches a name using multiple external APIs
+* Processes and structures the data
+* Stores results in a database (MongoDB)
+* Provides endpoints for retrieval, filtering, and deletion
+* Ensures idempotent behavior
 
 ---
 
@@ -23,21 +26,14 @@ It processes, validates, and persists structured results while ensuring idempote
 https://name-classification-api.vercel.app
 ```
 
-### Example Endpoints
-
-```bash
-GET  /api/classify?name=john
-POST /api/profiles
-```
-
 ---
 
 ## ⚙️ Tech Stack
 
 * Node.js
 * Express.js
+* MongoDB (Mongoose)
 * Axios
-* lowdb (JSON database)
 * UUID
 * CORS
 * dotenv
@@ -47,9 +43,15 @@ POST /api/profiles
 ## 📁 Project Structure
 
 ```
-name-classification-api/
+profile-intelligence-service/
 │
 ├── src/
+│   ├── config/
+│   │   └── db.js
+│   │
+│   ├── models/
+│   │   └── profile.model.js
+│   │
 │   ├── routes/
 │   │   ├── classify.route.js
 │   │   └── profile.route.js
@@ -59,10 +61,8 @@ name-classification-api/
 │   │   └── profile.service.js
 │   │
 │   └── utils/
-│       ├── helpers.js
-│       └── db.js
+│       └── helpers.js
 │
-├── db.json
 ├── index.js
 ├── package.json
 ├── .env
@@ -95,9 +95,9 @@ name-classification-api/
 
 ---
 
-# 🔵 Stage 1 – Profile Creation & Persistence
+# 🔵 Stage 1 – Profile Intelligence Service
 
-## 📥 Endpoint
+## 📥 1. Create Profile
 
 ### POST `/api/profiles`
 
@@ -111,7 +111,7 @@ name-classification-api/
 
 ---
 
-## ✅ Success Response (New Profile)
+### ✅ Success Response (201)
 
 ```json
 {
@@ -133,7 +133,7 @@ name-classification-api/
 
 ---
 
-## 🔁 Idempotent Response (Existing Profile)
+### 🔁 Idempotent Response (200)
 
 ```json
 {
@@ -156,7 +156,92 @@ name-classification-api/
 
 ---
 
-## ❌ Error Responses
+## 📥 2. Get Profile by ID
+
+### GET `/api/profiles/{id}`
+
+### ✅ Success Response (200)
+
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "b3f9c1e2-7d4a-4c91-9c2a-1f0a8e5b6d12",
+    "name": "emmanuel",
+    "gender": "male",
+    "gender_probability": 0.99,
+    "sample_size": 1234,
+    "age": 25,
+    "age_group": "adult",
+    "country_id": "NG",
+    "country_probability": 0.85,
+    "created_at": "2026-04-01T12:00:00Z"
+  }
+}
+```
+
+---
+
+## 📥 3. Get All Profiles (with Filtering)
+
+### GET `/api/profiles`
+
+### Optional Query Parameters
+
+* `gender`
+* `country_id`
+* `age_group`
+
+### Example
+
+```bash
+/api/profiles?gender=male&country_id=NG
+```
+
+---
+
+### ✅ Success Response (200)
+
+```json
+{
+  "status": "success",
+  "count": 2,
+  "data": [
+    {
+      "id": "id-1",
+      "name": "emmanuel",
+      "gender": "male",
+      "age": 25,
+      "age_group": "adult",
+      "country_id": "NG"
+    },
+    {
+      "id": "id-2",
+      "name": "john",
+      "gender": "male",
+      "age": 22,
+      "age_group": "adult",
+      "country_id": "US"
+    },
+  ]
+}
+```
+
+---
+
+## 📥 4. Delete Profile
+
+### DELETE `/api/profiles/{id}`
+
+### ✅ Success Response
+
+```
+204 No Content
+```
+
+---
+
+# ❌ Error Responses
 
 ### 400 – Missing Name
 
@@ -167,7 +252,7 @@ name-classification-api/
 }
 ```
 
-### 422 – Invalid Name Type
+### 422 – Invalid Type
 
 ```json
 {
@@ -176,27 +261,27 @@ name-classification-api/
 }
 ```
 
-### 422 – No Prediction Available
+### 404 – Not Found
 
 ```json
 {
   "status": "error",
-  "message": "No prediction available for the provided name"
+  "message": "Profile not found"
 }
 ```
 
-### 502 – External API Failure
+### 502 – External API Error
 
 ```json
 {
   "status": "error",
-  "message": "Failed to fetch external APIs"
+  "message": "Genderize returned an invalid response"
 }
 ```
 
 ---
 
-## 🧠 Processing Logic
+# 🧠 Processing Logic
 
 ### Genderize
 
@@ -220,42 +305,41 @@ name-classification-api/
 
 ### Nationalize
 
-* Extract:
+* Extract country list
+* Select highest probability:
 
-  * List of countries
-* Select:
-
-  * Country with highest probability → `country_id`
-
----
-
-## 💾 Data Persistence
-
-* Profiles are stored in a local JSON database (`db.json`)
-* Each profile includes:
-
-  * UUID
-  * Processed fields
-  * UTC timestamp
+  * `country_id`
+  * `country_probability`
 
 ---
 
-## 🔁 Idempotency
+# 💾 Data Persistence
 
-* Submitting the same name multiple times does **not create duplicates**
-* Existing record is returned instead
+* MongoDB used for persistent storage
+* Each record includes:
 
----
-
-## ⚡ Performance Notes
-
-* External API calls are executed in parallel using `Promise.all`
-* Response time optimized for efficiency
-* Lightweight storage ensures fast read/write operations
+  * UUID v7 identifier
+  * Processed API data
+  * ISO 8601 timestamp
 
 ---
 
-## 🔐 CORS
+# 🔁 Idempotency
+
+* Same name submission does not create duplicates
+* Existing profile is returned instead
+
+---
+
+# ⚡ Performance Notes
+
+* External API calls executed in parallel (`Promise.all`)
+* Efficient querying with MongoDB
+* Designed to handle multiple requests reliably
+
+---
+
+# 🔐 CORS
 
 ```
 Access-Control-Allow-Origin: *
@@ -263,7 +347,7 @@ Access-Control-Allow-Origin: *
 
 ---
 
-## 🚀 Running Locally
+# 🚀 Running Locally
 
 ### 1. Install dependencies
 
@@ -271,42 +355,43 @@ Access-Control-Allow-Origin: *
 npm install
 ```
 
-### 2. Start server
+### 2. Setup environment
+
+```env
+MONGO_URI=your_mongodb_connection_string
+PORT=3000
+```
+
+### 3. Start server
 
 ```bash
 npm run dev
 ```
 
-### 3. Test endpoints
-
-```bash
-http://localhost:3000/api/classify?name=john
-```
-
 ---
 
-## 🌍 Deployment
+# 🌍 Deployment
 
 Supported platforms:
 
 * Vercel
 * Railway
-* Heroku
 * AWS
+* Heroku
 
 ---
 
-## 🧪 Testing Checklist
+# 🧪 Testing Checklist
 
-* Valid request returns correct structure
-* Duplicate name returns existing profile
-* Missing name → 400 error
-* Invalid type → 422 error
-* Invalid predictions → 422 error
-* API failure → 502 error
+* Create profile successfully
+* Duplicate name returns existing record
+* Fetch by ID works
+* Filtering works correctly
+* Delete endpoint works
+* Error cases handled correctly
 
 ---
 
-## 👨‍💻 Author
+# 👨‍💻 Author
 
 FunGeek – Jeremiah Bankole

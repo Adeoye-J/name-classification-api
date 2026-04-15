@@ -1,9 +1,10 @@
 import express from "express";
 import { createProfile } from "../services/profile.service.js";
+import Profile from "../models/profile.model.js";
 
 const router = express.Router()
 
-router.post("/profile", async (req, res) => {
+router.post("/profiles", async (req, res) => {
     try {
         const {name} = req.body
 
@@ -57,6 +58,66 @@ router.post("/profile", async (req, res) => {
             message: error.message
         })
     }
+})
+
+router.get("/profiles/:id", async (req, res) => {
+    const profile = await Profile.findOne({ id: req.params.id })
+
+    if (!profile) {
+        return res.status(404).json({
+            status: "error",
+            message: "Profile not found"
+        })
+    }
+
+    res.status(200).json({
+        status: "success",
+        data: profile
+    })
+})
+
+router.get("/profiles", async (req, res) => {
+    const { gender, country_id, age_group } = req.query
+
+    const query = {}
+
+    if (gender) {
+        query.gender = gender.toLowerCase()
+    }
+    if (country_id) {
+        query.country_id = country_id.toUpperCase()
+    }
+    if (age_group) {
+        query.age_group = age_group.toLowerCase()
+    }
+
+    const profiles = await Profile.find(query);
+
+    res.json({
+        status: "success",
+        count: profiles.length,
+        data: profiles.map(profile => ({
+            id: profile.id,
+            name: profile.name,
+            gender: profile.gender,
+            age: profile.age,
+            age_group: profile.age_group,
+            country_id: profile.country_id
+        }))
+    })
+})
+
+router.delete("/profiles/:id", async (req, res) => {
+    const result = await Profile.findOneAndDelete({ id: req.params.id })
+
+    if (!result) {
+        return res.status(404).json({
+            status: "error",
+            message: "Profile not found"
+        })
+    }
+
+    res.status(204).send()
 })
 
 export default router

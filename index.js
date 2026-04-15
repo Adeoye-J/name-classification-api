@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import { connectDB } from "./src/config/bd.js";
+
 import classifyRoute from "./src/routes/classify.route.js"
 import profileRoute from "./src/routes/profile.route.js"
 
@@ -8,19 +10,18 @@ dotenv.config();
 
 const app = express();
 
-app.use(express.json())
+connectDB()
 
-// CORS
+// Middlewares
 app.use(
     cors({
         origin: "*"
     })
 )
+app.use(express.json())
 
-// Route: GET /api/classify
+// Routes
 app.use("/api", classifyRoute)
-
-// Route: POST /api/profile
 app.use("/api", profileRoute)
 
 const PORT = process.env.PORT || 3000;

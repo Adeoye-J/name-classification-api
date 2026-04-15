@@ -1,21 +1,31 @@
 import axios from "axios";
 import db from "../utils/bd.js";
+import Profile from "../models/profile.model.js"
 import { v7 as uuidv7 } from "uuid";
 
 export async function createProfile(name) {
     const normalized = name.trim().toLowerCase()
 
-    await db.read()
+    // await db.read()
 
     // Idempotentcy Check
-    const existing = db.data.profiles.find(
-        (p) => p.name === normalized
-    );
+    const existing = await Profile.findOne({ name: normalized })
 
     if (existing) {
         return {
             existing: true,
-            data: existing
+            data: {
+                id: existing.id,
+                name: existing.name,
+                gender: existing.gender,
+                gender_probability: existing.gender_probability,
+                sample_size: existing.sample_size,
+                age: existing.age,
+                age_group: existing.age_group,
+                country_id: existing.country_id,
+                country_probability: existing.country_probability,
+                created_at: existing.created_at
+            }
         }
     }
 
@@ -34,22 +44,22 @@ export async function createProfile(name) {
         // Edge Cases
         if (genderData.gender === null || genderData.count === 0 || Number(genderData.probability) < 0.6 || genderData.count < 10) {
             throw {
-                status: 422,
-                message: "No gender prediction available"
+                status: 502,
+                message: "Genderize returned an invalid response"
             }
         }
 
         if (ageData.age === null) {
             throw {
-                status: 422,
-                message: "No age prediction available"
+                status: 502,
+                message: "Agify returned an invalid response"
             }
         }
 
         if (!nationData.country || nationData.country.length === 0) {
             throw {
-                status: 422,
-                message: "No country prediction available"
+                status: 502,
+                message: "Nationalize returned an invalid response"
             }
         }
 
@@ -93,8 +103,7 @@ export async function createProfile(name) {
             created_at: new Date().toISOString()
         }
 
-        db.data.profiles.push(newProfile)
-        await db.write()
+        await Profile.create(newProfile)
 
         return {
             existing: false,
@@ -104,7 +113,7 @@ export async function createProfile(name) {
     } catch (error) {
         throw {
             status: error.status || 502,
-            message: error.message || "Failed to fetch external APIs"
+            message: error.message || "External API Failure"
         }
     }
 }
