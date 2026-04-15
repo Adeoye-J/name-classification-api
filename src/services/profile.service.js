@@ -1,14 +1,10 @@
 import axios from "axios";
-import db from "../utils/bd.js";
 import Profile from "../models/profile.model.js"
 import { v7 as uuidv7 } from "uuid";
 
 export async function createProfile(name) {
     const normalized = name.trim().toLowerCase()
 
-    // await db.read()
-
-    // Idempotentcy Check
     const existing = await Profile.findOne({ name: normalized })
 
     if (existing) {
